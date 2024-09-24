@@ -1,0 +1,3 @@
+[submodule "labyrinth"]
+	path = labyrinth
+	url = git@github.com:iris-ua/ciberRatoTools.git
