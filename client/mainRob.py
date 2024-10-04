@@ -3,6 +3,7 @@ import sys
 from croblink import *
 from math import *
 import xml.etree.ElementTree as ET
+from controller import *
 
 CELLROWS=7
 CELLCOLS=14
@@ -74,12 +75,15 @@ class MyRob(CRobLinkAngs):
            or self.measures.irSensor[back_id]   > 5.0:
             print('Rotate left')
             self.driveMotors(-0.1,+0.1)
+            u = controller("NONE",-0.1,+0.1)
         elif self.measures.irSensor[left_id]> 2.7:
             print('Rotate slowly right')
+            u = controller("NONE",0.1,0.0)
             self.driveMotors(0.1,0.0)
         elif self.measures.irSensor[right_id]> 2.7:
             print('Rotate slowly left')
-            self.driveMotors(0.0,0.1)
+            u = controller("NONE",0.0,0.1)
+            self.driveMotors(0.0- u ,0.1 + u)
         else:
             print('Go')
             self.driveMotors(0.1,0.1)

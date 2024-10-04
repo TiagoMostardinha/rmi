@@ -1,6 +1,6 @@
 #!/bin/bash
 EXERCISE="startC1"
-MAIN_PROGRAM="test.py"
+CLIENT_PROGRAM="mainRob.py"
 
 # delete previous session of $EXERCISE
 tmux has-session -t $EXERCISE 2>/dev/null
@@ -17,11 +17,11 @@ tmux new-session -d -s $EXERCISE
 tmux split-window -h -t $EXERCISE
 
 # run the command in the first pane
-tmux send-keys -t $EXERCISE:0.0 'cd ./labyrinth/ && ./'$EXERCISE'' C-m
+tmux send-keys -t $EXERCISE:1.1 'cd ./labyrinth/ && ./'$EXERCISE'' C-m
 
 sleep 2
 
-tmux send-keys -t $EXERCISE:0.1 'cd ./client/ && python3 '$MAIN_PROGRAM'' C-m
+tmux send-keys -t $EXERCISE:1.2 'cd ./client/ && python3 '$CLIENT_PROGRAM'' C-m
 
 # attach to the session
 tmux attach-session -t $EXERCISE
