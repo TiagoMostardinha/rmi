@@ -1,6 +1,6 @@
 #!/bin/bash
 EXERCISE="startC1"
-CLIENT_PROGRAM="mainRob.py"
+CLIENT_PROGRAM="c1/mainRob.py"
 
 # delete previous session of $EXERCISE
 tmux has-session -t $EXERCISE 2>/dev/null
