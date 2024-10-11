@@ -1,16 +1,33 @@
-
 import sys
 from croblink import *
 from math import *
 import xml.etree.ElementTree as ET
-from controller import *
+from common import utils, PID
+from dotenv import load_dotenv
+import os
+
+
 
 CELLROWS=7
 CELLCOLS=14
 
+# PID control
+PID_CONSTANTS = {
+    'KP': 0.0,
+    'KI':0.0,
+    'KD':0.0
+}
+
 class MyRob(CRobLinkAngs):
     def __init__(self, rob_name, rob_id, angles, host):
         CRobLinkAngs.__init__(self, rob_name, rob_id, angles, host)
+        self.pid = PID.PID(PID_CONSTANTS['KP'], PID_CONSTANTS['KI'], PID_CONSTANTS['KD'], 0.05)
+        self.sensor_data = {
+            0: [],
+            1: [],
+            2: [],
+            3: [],
+        }
 
     # In this map the center of cell (i,j), (i in 0..6, j in 0..13) is mapped to labMap[i*2][j*2].
     # to know if there is a wall on top of cell(i,j) (i in 0..5), check if the value of labMap[i*2+1][j*2] is space or not
@@ -30,8 +47,20 @@ class MyRob(CRobLinkAngs):
         stopped_state = 'run'
 
         while True:
-            self.readSensors()
+            irSensorData = []
 
+            for i in range(5):
+                self.readSensors()
+                irSensorData.append(self.measures.irSensor)
+            
+            print(irSensorData)
+
+            exit()
+
+            
+
+            
+            
             if self.measures.endLed:
                 print(self.robName + " exiting")
                 quit()
@@ -44,24 +73,13 @@ class MyRob(CRobLinkAngs):
                 state = 'stop'
 
             if state == 'run':
-                if self.measures.visitingLed==True:
-                    state='wait'
-                if self.measures.ground==0:
-                    self.setVisitingLed(True);
-                self.wander()
-            elif state=='wait':
-                self.setReturningLed(True)
-                if self.measures.visitingLed==True:
-                    self.setVisitingLed(False)
-                if self.measures.returningLed==True:
-                    state='return'
-                self.driveMotors(0.0,0.0)
-            elif state=='return':
-                if self.measures.visitingLed==True:
-                    self.setVisitingLed(False)
-                if self.measures.returningLed==True:
-                    self.setReturningLed(False)
-                self.wander()
+                if utils.isAtIntersection():
+                    pass
+
+                else:
+                    self.wander()
+
+
 
 
     def wander(self):
@@ -69,24 +87,29 @@ class MyRob(CRobLinkAngs):
         left_id = 1
         right_id = 2
         back_id = 3
-        if    self.measures.irSensor[center_id] > 5.0\
-           or self.measures.irSensor[left_id]   > 5.0\
-           or self.measures.irSensor[right_id]  > 5.0\
-           or self.measures.irSensor[back_id]   > 5.0:
-            print('Rotate left')
-            self.driveMotors(-0.1,+0.1)
-            u = controller("NONE",-0.1,+0.1)
-        elif self.measures.irSensor[left_id]> 2.7:
-            print('Rotate slowly right')
-            u = controller("NONE",0.1,0.0)
-            self.driveMotors(0.1,0.0)
-        elif self.measures.irSensor[right_id]> 2.7:
-            print('Rotate slowly left')
-            u = controller("NONE",0.0,0.1)
-            self.driveMotors(0.0- u ,0.1 + u)
-        else:
-            print('Go')
-            self.driveMotors(0.1,0.1)
+
+        # if self.measures.irSensor[left_id]> 2.7:
+        #     print('Rotate slowly right')
+        #     self.driveMotors(0.5,0.5)
+        # elif self.measures.irSensor[right_id]> 2.7:
+        #     print('Rotate slowly left')
+        #     self.driveMotors(0.5,0.5)
+        # else:
+            # TODO: get sensor data and store it in a dictionary
+        self.sensor_data = utils.smoothSensorData(self.sensor_data, self.measures.irSensor)
+
+        error = utils.calculateError(self.sensor_data,self.measures.irSensor)
+
+        self.lastError = error
+
+        u = self.pid.update(error)
+
+        self.driveMotors(0.2 + u, 0.2 - u)
+
+
+        # TODO: do left,rigt, in front logic
+
+
 
 class Map():
     def __init__(self, filename):
@@ -135,6 +158,13 @@ for i in range(1, len(sys.argv),2):
         quit()
 
 if __name__ == '__main__':
+    # Read the env
+    load_dotenv()
+
+    PID_CONSTANTS['KP']=float(os.getenv('KP'))
+    PID_CONSTANTS['KI']=float(os.getenv('KI'))
+    PID_CONSTANTS['KD']=float(os.getenv('KD'))
+
     rob=MyRob(rob_name,pos,[0.0,60.0,-60.0,180.0],host)
     if mapc != None:
         rob.setMap(mapc.labMap)
