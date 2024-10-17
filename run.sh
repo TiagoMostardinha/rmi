@@ -1,6 +1,6 @@
 #!/bin/bash
 EXERCISE="C1"
-CLIENT_PROGRAM="mainRob.py"
+CLIENT_PROGRAM="main.py"
 
 source ./venv/bin/activate
 
