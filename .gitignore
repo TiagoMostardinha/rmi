@@ -1,2 +1,4 @@
 client/*/__pycache__/
+client/*/*/__pycache__/
 venv/
+.vscode/

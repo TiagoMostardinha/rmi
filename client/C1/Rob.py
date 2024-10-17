@@ -1,6 +1,5 @@
 from croblink import *
-import time
-import math
+from utils.PID import PID
 
 WINDOW_SIZE = 5
 
@@ -9,11 +8,11 @@ LPF_CONST = {
     "sensors": ["front", "left", "right"]
 }
 
-
 PID_CONST = {
     "kp": 0.1,
-    "ki": 0.0,
-    "kd": 0.0
+    "ki": 0.1,
+    "kd": 0.1,
+    "h": 0.5
 }
 
 
@@ -32,6 +31,8 @@ class Rob(CRobLinkAngs):
             "left": 0,
             "right": 0
         }
+        
+        self.explore_pid = PID(PID_CONST)
 
     def run(self):
         if self.status != 0:
@@ -90,19 +91,19 @@ class Rob(CRobLinkAngs):
         back_sensor     = 3
         '''
 
-        self.sensorWindows["front"].append(self.measures.irSensor[0])
-        self.sensorWindows["left"].append(self.measures.irSensor[1])
-        self.sensorWindows["right"].append(self.measures.irSensor[2])
+        self.sensorWindows["front"].insert(0, self.measures.irSensor[0])
+        self.sensorWindows["left"].insert(0, self.measures.irSensor[1])
+        self.sensorWindows["right"].insert(0, self.measures.irSensor[2])
 
         if isFull(self.sensorWindows["front"]):
-            self.sensorWindows["front"].pop(0)
+            self.sensorWindows["front"].pop()
         if isFull(self.sensorWindows["left"]):
-            self.sensorWindows["left"].pop(0)
+            self.sensorWindows["left"].pop()
         if isFull(self.sensorWindows["right"]):
-            self.sensorWindows["right"].pop(0)
-
+            self.sensorWindows["right"].pop()
 
     # TODO: Low Pass Filter
+
     def lowPassFilter(self):
         '''
         I'll be using Exponential Moving Average (EMA), instead of Kalman Filter
@@ -110,13 +111,15 @@ class Rob(CRobLinkAngs):
         '''
         def lpf(current_value: float, last_value: float, alpha: float):
             return alpha * current_value + (1 - alpha) * last_value
-        
-        for sensor in LPF_CONST["sensors"]:
-            self.last_lpf[sensor] = round(lpf(self.sensorWindows[sensor][-1], self.last_lpf[sensor], LPF_CONST["alpha"]),5)
 
-        
+        for sensor in LPF_CONST["sensors"]:
+            self.last_lpf[sensor] = round(
+                lpf(self.sensorWindows[sensor][0],
+                    self.last_lpf[sensor], LPF_CONST["alpha"]),
+                5)
 
     # TODO: implement logic detect intersections
+
     def isAtIntersection(self):
         pass
 
@@ -137,5 +140,11 @@ class Rob(CRobLinkAngs):
         # TODO: implement logic about detecting intersections, turns and dead ends
 
         # TODO: Implement PID to keep on center
+        error = self.last_lpf["left"] - self.last_lpf["right"]
+        
+        u = self.explore_pid.update(error)
+        print("\n\nError:",error, "\nU:",u)
 
-        pass
+        self.driveMotors(0.1 + u, 0.1 - u)
+    
+    
