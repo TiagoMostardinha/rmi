@@ -1,7 +1,10 @@
 from croblink import *
 from utils.PID import PID
+import math
 
 WINDOW_SIZE = 5
+
+THRESHOLD = 0.66
 
 LPF_CONST = {
     "alpha": 2/(WINDOW_SIZE + 1),
@@ -9,16 +12,19 @@ LPF_CONST = {
 }
 
 PID_CONST = {
-    "kp": 0.1,
-    "ki": 0.1,
-    "kd": 0.1,
-    "h": 0.5
+    "kp": 0.2,
+    "ki": 4,
+    "kd": 0.3,
+    "h": 0.05
 }
 
 
 class Rob(CRobLinkAngs):
     def __init__(self, rob_name, rob_id, angles, host):
         CRobLinkAngs.__init__(self, rob_name, rob_id, angles, host)
+
+        self.lPow = 0.1
+        self.rPow = 0.1
 
         self.sensorWindows = {
             "front": [],
@@ -31,8 +37,10 @@ class Rob(CRobLinkAngs):
             "left": 0,
             "right": 0
         }
-        
+
         self.explore_pid = PID(PID_CONST)
+
+        self.roaming_cycles = 0
 
     def run(self):
         if self.status != 0:
@@ -66,6 +74,7 @@ class Rob(CRobLinkAngs):
                 state = 'stop'
 
             if state == 'run':
+                self.speedController()
                 self.explore()
 
     # TODO: check if window is full
@@ -91,9 +100,12 @@ class Rob(CRobLinkAngs):
         back_sensor     = 3
         '''
 
-        self.sensorWindows["front"].insert(0, self.measures.irSensor[0])
-        self.sensorWindows["left"].insert(0, self.measures.irSensor[1])
-        self.sensorWindows["right"].insert(0, self.measures.irSensor[2])
+        self.sensorWindows["front"].insert(
+            0, self.inverseDistance(self.measures.irSensor[0]))
+        self.sensorWindows["left"].insert(
+            0, self.inverseDistance(self.measures.irSensor[1]))
+        self.sensorWindows["right"].insert(
+            0, self.inverseDistance(self.measures.irSensor[2]))
 
         if isFull(self.sensorWindows["front"]):
             self.sensorWindows["front"].pop()
@@ -118,33 +130,70 @@ class Rob(CRobLinkAngs):
                     self.last_lpf[sensor], LPF_CONST["alpha"]),
                 5)
 
-    # TODO: implement logic detect intersections
+    def inverseDistance(self, distance):
+        return 1/distance if abs(distance) > 0.01 else 0
 
+    # TODO: implement logic detect intersections
     def isAtIntersection(self):
-        pass
+        if self.last_lpf["front"] > 3*THRESHOLD and self.last_lpf["left"] > 2*THRESHOLD and self.last_lpf["right"] > 2*THRESHOLD:
+            return True
+        if self.last_lpf["front"] > 3*THRESHOLD and self.last_lpf["left"] > 2*THRESHOLD:
+            return True
+        if self.last_lpf["front"] > 3*THRESHOLD and self.last_lpf["right"] > 2*THRESHOLD:
+            return True
+        if self.last_lpf["left"] > 2*THRESHOLD and self.last_lpf["right"] > 2*THRESHOLD:
+            return True
+        return False
 
     # TODO: implement logic to detect turns
+
     def isAtTurn(self):
-        # TODO: might do specific use case where you can go straight instead of turning
-        pass
+        if self.last_lpf["front"] > 2*THRESHOLD and (self.last_lpf["left"] > 2 * THRESHOLD or self.last_lpf["right"] > 2*THRESHOLD):
+            return True
+        return False
 
     # TODO: implement logic to detect dead ends
 
     def isAtDeadEnd(self):
-        pass
+        if self.last_lpf["left"] < THRESHOLD and self.last_lpf["right"] < THRESHOLD and self.last_lpf["front"] < THRESHOLD:
+            return True
+        return False
+
+    def speedController(self):
+        def controlSpeed(value: float):
+            return round(0.402*value+0.210, 3)
+        min_lpf = min(self.last_lpf["front"],
+                      self.last_lpf["left"],
+                      self.last_lpf["right"])
+
+        speed = controlSpeed(min_lpf)
+        self.lPow,  self.rPow = speed, speed
 
     # TODO: implement explore logic
 
     def explore(self):
+        lPow, rPow = self.lPow, self.rPow
 
         # TODO: implement logic about detecting intersections, turns and dead ends
+        if self.roaming_cycles > 0:
+            lPow, rPow = 0.1, 0.1
+            self.roaming_cycles -= 1
+        elif self.isAtIntersection():
+            print("Intersection detected")
+            self.roaming_cycles = 10
 
-        # TODO: Implement PID to keep on center
-        error = self.last_lpf["left"] - self.last_lpf["right"]
-        
-        u = self.explore_pid.update(error)
-        print("\n\nError:",error, "\nU:",u)
+        elif self.isAtTurn():
+            # TODO: might do specific use case where you can go straight instead of turning
+            print("Turn detected")
 
-        self.driveMotors(0.1 + u, 0.1 - u)
-    
-    
+        elif self.isAtDeadEnd():
+            print("Dead end detected")
+            lPow, rPow = -0.1, -0.1
+        else:
+            error = self.last_lpf["left"] - self.last_lpf["right"]
+            u = self.explore_pid.update(error)
+            lPow -= u
+            rPow += u
+
+        self.driveMotors(lPow, rPow)
+        print("Left: ", round(self.lPow,3), "Right: ", round(self.rPow,3))

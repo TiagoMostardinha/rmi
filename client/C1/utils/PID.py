@@ -33,7 +33,7 @@ class PID():
 
         '''
         Compute the control signal
-        '''        
+        '''
         u = self.last_u + self.ke[0] * self.last_errors[0] + self.ke[1] * self.last_errors[1] + self.ke[2] * self.last_errors[2]
         self.last_u = u
 

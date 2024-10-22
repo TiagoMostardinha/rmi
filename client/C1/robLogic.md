@@ -52,3 +52,10 @@ To program your robot to navigate the unknown closed circuit effectively, you’
 5. **Collision Handling**: If a collision is detected, backtrack and correct the movement.
 
 By combining these techniques, your robot will be able to navigate the unknown closed circuit efficiently and avoid collisions while handling sensor noise and false negatives.
+
+
+
+---
+
+# C2
+change sensor to be 90º it will be easier to detect if there are intersections and other cells

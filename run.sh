@@ -1,6 +1,11 @@
 #!/bin/bash
 EXERCISE="C1"
-CLIENT_PROGRAM="main.py"
+
+# MAP configuration
+ARGS=" --param ../Labs/rmi-2425/C1-config.xml"
+ARGS+=" --lab ../Labs/rmi-2425/C1-lab.xml"
+ARGS+=" --grid ../Labs/rmi-2425/C1-grid.xml"
+ARGS+=" --scoring 1"
 
 source ./venv/bin/activate
 
@@ -17,13 +22,13 @@ tmux new-session -d -s $EXERCISE
 
 # split the window
 tmux split-window -h -t $EXERCISE
+tmux split-window -v -t $EXERCISE
 
-# run the command in the first pane
-tmux send-keys -t $EXERCISE:1.1 'cd ./labyrinth/ && ./start'$EXERCISE'' C-m
 
+tmux send-keys -t $EXERCISE:1.2 'cd ./labyrinth/simulator; ./simulator --param ../Labs/rmi-2425/C1-config.xml --lab ../Labs/rmi-2425/C1-lab.xml --grid ../Labs/rmi-2425/C1-grid.xml --scoring 1' C-m
 sleep 2
+tmux send-keys -t $EXERCISE:1.3 'cd ./labyrinth/Viewer; ./Viewer --autoconnect' C-m
+sleep 1
+tmux send-keys -t $EXERCISE:1.1 'cd ./client/'$EXERCISE'; python3 main.py' C-m
 
-tmux send-keys -t $EXERCISE:1.2 'cd ./client/'$EXERCISE' && python3 '$CLIENT_PROGRAM'' C-m
-
-# attach to the session
 tmux attach-session -t $EXERCISE
